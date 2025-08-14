@@ -4,7 +4,7 @@ import re
 from urllib.parse import urljoin
 from sentence_transformers import SentenceTransformer
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
+model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
 
 def fetch_govuk_page(url, follow_links=False, max_links=3):
     def clean_and_format(soup):
