@@ -1,47 +1,64 @@
 import streamlit as st
-from utils import fetch_govuk_page, chunk_text, embed_texts
-import numpy as np
+from utils import fetch_govuk_page
+from sentence_transformers import SentenceTransformer
 import faiss
+import numpy as np
 
-st.set_page_config(page_title="GOV.UK Data Scout")
-st.title("🔍 GOV.UK Data Scout")
+# Load the sentence transformer model
+model = SentenceTransformer('all-MiniLM-L6-v2')
 
-st.markdown("Paste one or more GOV.UK URLs to extract and semantically search structured content.")
+def embed_texts(texts):
+    return model.encode(texts, show_progress_bar=False).tolist()
 
-urls = st.text_area("Enter GOV.UK URLs (one per line):", height=150)
+def chunk_text(text, max_tokens=400):
+    paragraphs = text.split('\n')
+    chunks = []
+    current_chunk = []
+    current_length = 0
+    for para in paragraphs:
+        para = para.strip()
+        if not para:
+            continue
+        length = len(para.split())
+        if current_length + length > max_tokens:
+            chunks.append('\n'.join(current_chunk))
+            current_chunk = [para]
+            current_length = length
+        else:
+            current_chunk.append(para)
+            current_length += length
+    if current_chunk:
+        chunks.append('\n'.join(current_chunk))
+    return chunks
 
-if st.button("Process Pages"):
-    url_list = [url.strip() for url in urls.splitlines() if url.strip()]
-    all_chunks = []
+# --- Streamlit App Starts Here ---
+st.title("🔎 GOV.UK Data Scout")
 
-    for url in url_list:
-        try:
-            text = fetch_govuk_page(url)
+url = st.text_input("Enter a GOV.UK page URL to fetch content:")
+
+if url:
+    try:
+        with st.spinner("Fetching and processing content..."):
+            text = fetch_govuk_page(url, follow_links=False)
             chunks = chunk_text(text)
-            all_chunks.extend(chunks)
-            st.success(f"✅ {url} processed ({len(chunks)} chunks)")
-        except Exception as e:
-            st.error(f"❌ Error processing {url}: {e}")
+            embeddings = embed_texts(chunks)
+            index = faiss.IndexFlatL2(len(embeddings[0]))
+            index.add(np.array(embeddings).astype("float32"))
 
-    if all_chunks:
-        embeddings = embed_texts(all_chunks)
-        index = faiss.IndexFlatL2(len(embeddings[0]))
-        index.add(np.array(embeddings).astype("float32"))
+            st.session_state["chunks"] = chunks
+            st.session_state["index"] = index
 
-        st.session_state["chunks"] = all_chunks
-        st.session_state["index"] = index
-        st.success("🚀 Pages embedded. You can now ask a question below.")
+        st.success("✅ Page processed successfully! Ask a question below:")
 
-# Semantic search
-if "index" in st.session_state and "chunks" in st.session_state:
-    query = st.text_input("🔍 Ask a question about the content:")
+        query = st.text_input("Ask a question about the page content:")
+        if query and "index" in st.session_state:
+            query_embedding = embed_texts([query])[0]
+            D, I = st.session_state["index"].search(np.array([query_embedding]).astype("float32"), 5)
 
-    if query:
-        query_embedding = embed_texts([query])[0]
-        D, I = st.session_state["index"].search(np.array([query_embedding]).astype("float32"), 3)
+            st.subheader("🔎 Top Matching Chunks")
+            for i in I[0]:
+                st.markdown(st.session_state["chunks"][i])
+                st.markdown("---")
 
-        st.subheader("🔎 Most Relevant Chunks")
-        for i in I[0]:
-            chunk = st.session_state["chunks"][i]
-            st.markdown(f"**Chunk #{i+1}:**\n\n{chunk}")
-
+    except Exception as e:
+        st.error(f"Error: {e}")
