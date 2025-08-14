@@ -4,7 +4,7 @@ from sentence_transformers import SentenceTransformer
 import faiss
 import numpy as np
 
-# Load the sentence transformer model
+# Load embedding model
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
 def embed_texts(texts):
@@ -32,33 +32,39 @@ def chunk_text(text, max_tokens=400):
     return chunks
 
 # --- Streamlit App Starts Here ---
-st.title("🔎 GOV.UK Data Scout")
+st.title("🔎 GOV.UK Multi-Page Data Scout")
 
-url = st.text_input("Enter a GOV.UK page URL to fetch content:")
+urls_input = st.text_area("Enter one or more GOV.UK page URLs (one per line):")
+urls = [u.strip() for u in urls_input.splitlines() if u.strip()]
 
-if url:
+if urls:
     try:
         with st.spinner("Fetching and processing content..."):
-            text = fetch_govuk_page(url, follow_links=False)
-            chunks = chunk_text(text)
-            embeddings = embed_texts(chunks)
+            all_chunks = []
+            for url in urls:
+                st.write(f"📄 Processing: {url}")
+                text = fetch_govuk_page(url, follow_links=False)
+                chunks = chunk_text(text)
+                all_chunks.extend(chunks)
+
+            embeddings = embed_texts(all_chunks)
             index = faiss.IndexFlatL2(len(embeddings[0]))
             index.add(np.array(embeddings).astype("float32"))
 
-            st.session_state["chunks"] = chunks
+            st.session_state["chunks"] = all_chunks
             st.session_state["index"] = index
 
-        st.success("✅ Page processed successfully! Ask a question below:")
+        st.success("✅ All pages processed! Ask a question below:")
 
-        query = st.text_input("Ask a question about the page content:")
+        query = st.text_input("Ask a question about the content:")
         if query and "index" in st.session_state:
             query_embedding = embed_texts([query])[0]
             D, I = st.session_state["index"].search(np.array([query_embedding]).astype("float32"), 5)
 
-            st.subheader("🔎 Top Matching Chunks")
+            st.subheader("🔍 Top Matching Content")
             for i in I[0]:
                 st.markdown(st.session_state["chunks"][i])
                 st.markdown("---")
 
     except Exception as e:
-        st.error(f"Error: {e}")
+        st.error(f"🚨 Error: {e}")
