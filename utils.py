@@ -1,57 +1,64 @@
 import requests
 from bs4 import BeautifulSoup
 import re
-from sentence_transformers import SentenceTransformer
+from urllib.parse import urljoin, urlparse
 
-# Fetch and clean GOV.UK page content
-def fetch_govuk_page(url):
-    response = requests.get(url)
-    response.raise_for_status()
+def fetch_govuk_page(url, follow_links=False, max_links=3):
+    """
+    Fetches structured content from a GOV.UK page. Optionally follows internal GOV.UK links.
+    """
+    def clean_and_format(soup):
+        parts = []
 
-    soup = BeautifulSoup(response.text, 'html.parser')
+        for elem in soup.find_all(['h1', 'h2', 'h3', 'h4', 'p', 'ul', 'ol', 'li', 'a']):
+            if elem.name in ['h1', 'h2', 'h3']:
+                level = int(elem.name[1])
+                parts.append(f"{'#' * level} {elem.get_text(strip=True)}")
 
-    # Remove unwanted elements
-    for script_or_style in soup(['script', 'style']):
-        script_or_style.decompose()
+            elif elem.name == 'p':
+                parts.append(elem.get_text(strip=True))
 
-    # Extract main content
-    main_content = soup.find('main')
-    if not main_content:
-        raise ValueError("No <main> content found on the page.")
+            elif elem.name in ['ul', 'ol']:
+                for li in elem.find_all('li'):
+                    parts.append(f"- {li.get_text(strip=True)}")
 
-    text = main_content.get_text(separator='\n')
-    text = re.sub(r'\n+', '\n', text).strip()
+            elif elem.name == 'a' and elem.get('href'):
+                href = elem['href']
+                full_url = urljoin(url, href)
+                link_text = elem.get_text(strip=True)
+                parts.append(f"[{link_text}]({full_url})")
 
-    return text
+        # Collapse excess spacing
+        return '\n'.join(part for part in parts if part).strip()
 
-# Chunk text into ~400-token blocks
-def chunk_text(text, max_tokens=400):
-    paragraphs = text.split('\n')
-    chunks = []
-    current_chunk = []
-    current_length = 0
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
 
-    for para in paragraphs:
-        para = para.strip()
-        if not para:
-            continue
-        length = len(para.split())
+        main = soup.find('main')
+        if not main:
+            raise ValueError("No <main> content found")
 
-        if current_length + length > max_tokens:
-            chunks.append('\n'.join(current_chunk))
-            current_chunk = [para]
-            current_length = length
-        else:
-            current_chunk.append(para)
-            current_length += length
+        content = clean_and_format(main)
 
-    if current_chunk:
-        chunks.append('\n'.join(current_chunk))
+        # (Optional) Follow and extract from internal GOV.UK links
+        if follow_links:
+            internal_links = [
+                urljoin(url, a['href'])
+                for a in main.find_all('a', href=True)
+                if a['href'].startswith('/') and 'mailto:' not in a['href']
+            ]
+            visited = set()
+            for link in internal_links[:max_links]:
+                if link not in visited:
+                    visited.add(link)
+                    try:
+                        sub_content = fetch_govuk_page(link, follow_links=False)
+                        content += f"\n\n---\n\n## Linked Page: {link}\n\n{sub_content}"
+                    except Exception as e:
+                        print(f"Skipped link {link}: {e}")
+        return content
 
-    return chunks
-
-# Load local model and create embeddings
-model = SentenceTransformer('all-MiniLM-L6-v2')
-
-def embed_texts(texts):
-    return model.encode(texts, show_progress_bar=False).tolist()
+    except Exception as e:
+        raise RuntimeError(f"Failed to fetch or parse page: {e}")
