@@ -4,49 +4,36 @@ import re
 from urllib.parse import urljoin
 from sentence_transformers import SentenceTransformer
 
-# Load local sentence embedding model
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
-
 def fetch_govuk_page(url, follow_links=False, max_links=3):
-    """
-    Fetches structured content from a GOV.UK page. Optionally follows internal GOV.UK links.
-    """
     def clean_and_format(soup):
         parts = []
-
         for elem in soup.find_all(['h1', 'h2', 'h3', 'h4', 'p', 'ul', 'ol', 'li', 'a']):
             if elem.name in ['h1', 'h2', 'h3']:
                 level = int(elem.name[1])
                 parts.append(f"{'#' * level} {elem.get_text(strip=True)}")
-
             elif elem.name == 'p':
                 parts.append(elem.get_text(strip=True))
-
             elif elem.name in ['ul', 'ol']:
                 for li in elem.find_all('li'):
                     parts.append(f"- {li.get_text(strip=True)}")
-
             elif elem.name == 'a' and elem.get('href'):
                 href = elem['href']
                 full_url = urljoin(url, href)
                 link_text = elem.get_text(strip=True)
                 parts.append(f"[{link_text}]({full_url})")
-
         return '\n'.join(part for part in parts if part).strip()
 
     try:
         response = requests.get(url)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
-
         main = soup.find('main')
         if not main:
             raise ValueError("No <main> content found")
-
         content = clean_and_format(main)
 
-        # (Optional) Follow and extract from internal GOV.UK links
         if follow_links:
             internal_links = [
                 urljoin(url, a['href'])
@@ -63,28 +50,20 @@ def fetch_govuk_page(url, follow_links=False, max_links=3):
                     except Exception as e:
                         print(f"Skipped link {link}: {e}")
         return content
-
     except Exception as e:
         raise RuntimeError(f"Failed to fetch or parse page: {e}")
 
-
 def chunk_text(text, max_words=400):
-    """
-    Splits text into chunks of ~max_words, preserving line structure.
-    """
     lines = text.split('\n')
     chunks = []
     current_chunk = []
     current_length = 0
-
     for line in lines:
         line = line.strip()
         if not line:
             continue
-
         line_words = line.split()
         line_length = len(line_words)
-
         if current_length + line_length > max_words:
             chunks.append('\n'.join(current_chunk))
             current_chunk = [line]
@@ -92,15 +71,9 @@ def chunk_text(text, max_words=400):
         else:
             current_chunk.append(line)
             current_length += line_length
-
     if current_chunk:
         chunks.append('\n'.join(current_chunk))
-
     return chunks
 
-
 def embed_texts(texts):
-    """
-    Takes a list of text chunks and returns their vector embeddings using the local model.
-    """
     return model.encode(texts, show_progress_bar=False).tolist()
