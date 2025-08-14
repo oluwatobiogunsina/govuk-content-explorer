@@ -37,7 +37,7 @@ st.title("🔎 GOV.UK Multi-Page Data Scout")
 urls_input = st.text_area("Enter one or more GOV.UK page URLs (one per line):")
 urls = [u.strip() for u in urls_input.splitlines() if u.strip()]
 
-if urls:
+if urls and st.button("🚀 Process Pages"):
     try:
         with st.spinner("Fetching and processing content..."):
             all_chunks = []
@@ -56,15 +56,17 @@ if urls:
 
         st.success("✅ All pages processed! Ask a question below:")
 
-        query = st.text_input("Ask a question about the content:")
-        if query and "index" in st.session_state:
-            query_embedding = embed_texts([query])[0]
-            D, I = st.session_state["index"].search(np.array([query_embedding]).astype("float32"), 5)
-
-            st.subheader("🔍 Top Matching Content")
-            for i in I[0]:
-                st.markdown(st.session_state["chunks"][i])
-                st.markdown("---")
-
     except Exception as e:
         st.error(f"🚨 Error: {e}")
+
+# Only show Q&A if data has been processed
+if "index" in st.session_state and "chunks" in st.session_state:
+    query = st.text_input("Ask a question about the content:")
+    if query:
+        query_embedding = embed_texts([query])[0]
+        D, I = st.session_state["index"].search(np.array([query_embedding]).astype("float32"), 5)
+
+        st.subheader("🔍 Top Matching Content")
+        for i in I[0]:
+            st.markdown(st.session_state["chunks"][i])
+            st.markdown("---")
