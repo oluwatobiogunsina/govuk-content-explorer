@@ -62,3 +62,34 @@ def fetch_govuk_page(url, follow_links=False, max_links=3):
 
     except Exception as e:
         raise RuntimeError(f"Failed to fetch or parse page: {e}")
+
+def chunk_text(text, max_words=400):
+    """
+    Splits text into chunks of ~max_words, preserving line structure.
+    """
+    lines = text.split('\n')
+    chunks = []
+    current_chunk = []
+    current_length = 0
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        line_words = line.split()
+        line_length = len(line_words)
+
+        if current_length + line_length > max_words:
+            chunks.append('\n'.join(current_chunk))
+            current_chunk = [line]
+            current_length = line_length
+        else:
+            current_chunk.append(line)
+            current_length += line_length
+
+    if current_chunk:
+        chunks.append('\n'.join(current_chunk))
+
+    return chunks
+
