@@ -37,27 +37,4 @@ st.title("🔎 GOV.UK Multi-Page Data Scout")
 urls_input = st.text_area("Enter one or more GOV.UK page URLs (one per line):")
 urls = [u.strip() for u in urls_input.splitlines() if u.strip()]
 
-if urls and st.button("🚀 Process Pages"):
-    try:
-        with st.spinner("Fetching and processing content..."):
-            all_chunks = []
-            for url in urls:
-                try:
-                    st.markdown(f"📄 Processing: [{url}]({url})")
-                    text = fetch_govuk_page(url, follow_links=False)
-                    chunks = chunk_text(text)
-                    all_chunks.extend(chunks)
-                    st.success(f"✅ Extracted {len(chunks)} chunks from {url}")
-                except Exception as e:
-                    st.warning(f"⚠️ Skipped {url}: {e}")
-
-            if not all_chunks:
-                st.error("❌ No valid content found on any page.")
-            else:
-                embeddings = embed_texts(all_chunks)
-                index = faiss.IndexFlatL2(len(embeddings[0]))
-                index.add(np.array(embeddings).astype("float32"))
-
-                st.session_state["chunks"] = all_chunks
-                st.session_state["index"] = index
-                st.success("✅ All pages processed! Ask a
+if urls and st.button("🚀
