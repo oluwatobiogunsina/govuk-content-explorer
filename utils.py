@@ -1,7 +1,12 @@
 import requests
 from bs4 import BeautifulSoup
 import re
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
+from sentence_transformers import SentenceTransformer
+
+# Load local sentence embedding model
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
 
 def fetch_govuk_page(url, follow_links=False, max_links=3):
     """
@@ -28,7 +33,6 @@ def fetch_govuk_page(url, follow_links=False, max_links=3):
                 link_text = elem.get_text(strip=True)
                 parts.append(f"[{link_text}]({full_url})")
 
-        # Collapse excess spacing
         return '\n'.join(part for part in parts if part).strip()
 
     try:
@@ -63,6 +67,7 @@ def fetch_govuk_page(url, follow_links=False, max_links=3):
     except Exception as e:
         raise RuntimeError(f"Failed to fetch or parse page: {e}")
 
+
 def chunk_text(text, max_words=400):
     """
     Splits text into chunks of ~max_words, preserving line structure.
@@ -93,3 +98,9 @@ def chunk_text(text, max_words=400):
 
     return chunks
 
+
+def embed_texts(texts):
+    """
+    Takes a list of text chunks and returns their vector embeddings using the local model.
+    """
+    return model.encode(texts, show_progress_bar=False).tolist()
