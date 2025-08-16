@@ -1,41 +1,34 @@
 import streamlit as st
-from utils import fetch_govuk_page, chunk_text, embed_texts
-import faiss
-import numpy as np
+from utils import fetch_govuk_page_with_links, chunk_text
 
 st.set_page_config(page_title="GOV.UK Data Scout", layout="wide")
+
 st.title("🔎 GOV.UK Data Scout")
-st.write("Paste one or more GOV.UK URLs below to fetch and chunk content for search.")
+st.markdown("Paste one or more GOV.UK URLs below (one per line). We'll extract and chunk the content including a few internal links.")
 
-urls_input = st.text_area("GOV.UK URLs (one per line):", height=150)
-process = st.button("🚀 Process Pages")
+# Text area for URLs
+urls_input = st.text_area("Enter GOV.UK URLs (one per line):", height=200)
+process_button = st.button("🚀 Process Pages")
 
-if process and urls_input:
-    urls = [url.strip() for url in urls_input.splitlines() if url.strip()]
+if process_button and urls_input:
+    urls = [u.strip() for u in urls_input.splitlines() if u.strip()]
     all_chunks = []
-    for url in urls:
-        try:
-            text = fetch_govuk_page(url)
-            chunks = chunk_text(text)
-            all_chunks.extend(chunks)
-        except Exception as e:
-            st.error(f"Error fetching {url}: {e}")
+
+    with st.spinner("Fetching and chunking content..."):
+        for url in urls:
+            st.subheader(f"🔗 {url}")
+            try:
+                # Fetch full content including some internal links
+                full_text = fetch_govuk_page_with_links(url, follow_links=True, max_links=3)
+                chunks = chunk_text(full_text, max_words=150)
+
+                for i, chunk in enumerate(chunks):
+                    st.markdown(f"**Chunk {i+1}:**")
+                    st.code(chunk, language='markdown')
+                    all_chunks.append(chunk)
+
+            except Exception as e:
+                st.error(f"Failed to process {url}: {e}")
 
     if all_chunks:
-        embeddings = embed_texts(all_chunks)
-        index = faiss.IndexFlatL2(len(embeddings[0]))
-        index.add(np.array(embeddings).astype("float32"))
-        st.session_state["chunks"] = all_chunks
-        st.session_state["index"] = index
-        st.success("✅ All pages processed! Ask a question below:")
-    else:
-        st.error("❌ No valid content found.")
-        
-query = st.text_input("Ask a question:")
-if query and "index" in st.session_state:
-    q_embed = embed_texts([query])[0]
-    D, I = st.session_state["index"].search(np.array([q_embed]).astype("float32"), 5)
-    st.subheader("🔍 Most Relevant Chunks")
-    for i in I[0]:
-        st.markdown(st.session_state["chunks"][i])
-        st.markdown("---")
+        st.success("✅ Done! All chunks generated.")
