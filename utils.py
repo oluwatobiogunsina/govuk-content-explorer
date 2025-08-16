@@ -5,9 +5,12 @@ from urllib.parse import urljoin
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
-# --- Content Fetching ---
+# --- Content Fetching and Cleaning ---
 
 def fetch_govuk_page(url, follow_links=False, max_links=3):
+    """
+    Fetches structured content from a GOV.UK page. Optionally follows internal GOV.UK links.
+    """
     def clean_and_format(soup):
         parts = []
         for elem in soup.find_all(['h1', 'h2', 'h3', 'p', 'ul', 'ol', 'li']):
@@ -46,12 +49,13 @@ def fetch_govuk_page(url, follow_links=False, max_links=3):
                     except Exception as e:
                         print(f"Skipped link {link}: {e}")
         return content
+
     except Exception as e:
         raise RuntimeError(f"Failed to fetch or parse page: {e}")
 
 # --- Chunking ---
 
-def chunk_text(text, max_tokens=300):
+def chunk_text(text, max_tokens=400):
     paragraphs = text.split('\n')
     chunks = []
     current_chunk = []
@@ -76,14 +80,12 @@ def chunk_text(text, max_tokens=300):
 
     return chunks
 
-# --- Embeddings ---
+# --- Embeddings and Similarity Search ---
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
 def embed_texts(texts):
     return model.encode(texts, show_progress_bar=False).tolist()
-
-# --- Similarity Search ---
 
 def get_top_matches(query, texts, embeddings, top_n=3):
     query_embedding = model.encode([query])
