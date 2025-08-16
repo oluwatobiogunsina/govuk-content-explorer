@@ -73,3 +73,26 @@ def chunk_text(text: str, max_words=150) -> List[str]:
         chunk = ' '.join(words[i:i + max_words])
         chunks.append(chunk.strip())
     return chunks
+
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+
+# Load once
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+
+def embed_texts(texts):
+    """
+    Generate embeddings for a list of texts using a local model.
+    """
+    return embedding_model.encode(texts, show_progress_bar=False)
+
+def get_top_matches(question, chunks, chunk_embeddings, top_n=3):
+    """
+    Embed the question, compare to chunk embeddings, and return top N most similar chunks.
+    """
+    question_embedding = embedding_model.encode([question])
+    similarities = cosine_similarity(question_embedding, chunk_embeddings)[0]
+
+    top_indices = similarities.argsort()[-top_n:][::-1]
+    return [(chunks[i], similarities[i]) for i in top_indices]
+
