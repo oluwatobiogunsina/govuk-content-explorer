@@ -52,3 +52,4 @@ if st.session_state.chunks and st.session_state.embeddings:
         for i, (chunk, score) in enumerate(results, 1):
             st.markdown(f"**{i}.** (Relevance: {score:.2f})")
             st.code(chunk, language="markdown")
+
