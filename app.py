@@ -91,11 +91,12 @@ if st.session_state.chunks and st.session_state.embeddings:
             st.code(chunk, language="markdown")
 
 # -- View All Chunks by Page --
-if st.session_state.chunked_pages:
+if st.session_state.chunks:
     st.markdown("## 📄 View all chunks by page")
     for url, chunks in st.session_state.chunked_pages.items():
         st.markdown(f"### 🔗 {url}")
         for i, chunk in enumerate(chunks):
             with st.expander(f"Chunk {i+1}"):
                 st.markdown(chunk)
+
 
