@@ -17,73 +17,58 @@ This tool helps evaluate how GOV.UK content performs in AI-powered retrieval sys
 with st.expander("💡 What You Can Learn"):
     st.markdown("""
     **1. Content structure**  
-    See how your content is chunked. Are the chunks focused and meaningful on their own? This helps assess whether your content works when consumed out of its original context — critical for AI tools.
+    See how your content is chunked. Are the chunks focused and meaningful on their own? This helps assess whether your content works when consumed out of its original context.
 
-    **2. AI-friendliness**  
-    Try asking a question. Do the retrieved chunks answer it well? This shows how well your content performs in a retrieval-augmented generation (RAG) system, where relevant information is passed to an LLM to answer user queries.
+    **2. Metadata gaps**  
+    Look at what’s included or missing in each chunk. Consider what metadata (e.g. audience, date, type) could help an AI system filter or rank it.
 
-    **3. Metadata and clarity gaps**  
-    You can infer where metadata might help improve retrieval accuracy. If irrelevant chunks are shown, it may be due to a lack of:
-    - Clear headings or structure  
-    - Time- or audience-specific labelling  
-    - Consistent terminology
-
-    These insights help you identify opportunities to improve the **AI readiness** of your content.
+    **3. Retrieval experience**  
+    Try asking a question and reviewing the retrieved chunks. Are they precise and trustworthy? If not, what improvements could help?
     """)
 
+# Input and process URLs
+urls_input = st.text_area("Paste one or more GOV.UK URLs (one per line):")
+follow_links = st.checkbox("Follow internal links from each page?", value=False)
 
-# Session state for storing page content and embeddings
-if "chunks" not in st.session_state:
-    st.session_state.chunks = []
-if "embeddings" not in st.session_state:
-    st.session_state.embeddings = []
+if st.button("🚀 Process pages"):
+    urls = [u.strip() for u in urls_input.splitlines() if u.strip()]
+    if urls:
+        all_chunks = []
+        chunked_pages = {}
 
-# Input
-urls_input = st.text_area("Enter GOV.UK page URLs (one per line):", height=150)
-follow_links = st.checkbox("Follow internal links on each page", value=False)
+        with st.spinner("Fetching and chunking content..."):
+            for url in urls:
+                try:
+                    content = fetch_govuk_page(url, follow_links=follow_links)
+                    chunks = chunk_text(content)
+                    chunked_pages[url] = chunks
+                    all_chunks.extend(chunks)
+                except Exception as e:
+                    st.error(f"Error fetching {url}: {e}")
 
-# Process Pages
-if urls_input and st.button("🚀 Process Pages"):
-    urls = [url.strip() for url in urls_input.splitlines() if url.strip()]
-    all_chunks = []
+        if all_chunks:
+            embeddings = embed_texts(all_chunks)
+            st.session_state["chunks"] = all_chunks
+            st.session_state["embeddings"] = embeddings
+            st.session_state["chunked_pages"] = chunked_pages
+            st.success("✅ All pages processed! Ask a question below.")
+        else:
+            st.warning("No valid content found.")
 
-    with st.spinner("Fetching and processing content..."):
-        for url in urls:
-            try:
-                content = fetch_govuk_page(url, follow_links=follow_links)
-                chunks = chunk_text(content, max_tokens=250)  # Limit chunk size
-                all_chunks.extend(chunks)
-                st.success(f"✅ Processed {url} ({len(chunks)} chunks)")
-            except Exception as e:
-                st.error(f"❌ Failed to process {url}: {e}")
+# Search interface
+if "chunks" in st.session_state and "embeddings" in st.session_state:
+    query = st.text_input("Ask a question to test semantic retrieval:")
+    if query:
+        top_matches = get_top_matches(query, st.session_state["chunks"], st.session_state["embeddings"])
+        st.subheader("🔎 Top Matching Chunks")
+        for match, score in top_matches:
+            st.markdown(f"**Score:** {score:.2f}")
+            st.code(match, language="markdown")
 
-    # Store in session state
-    st.session_state.chunks = all_chunks
-    st.session_state.embeddings = embed_texts(all_chunks)
-    st.success("✅ All pages processed and embeddings generated!")
-
-# Search / Ask a question
-if st.session_state.chunks and st.session_state.embeddings:
     st.markdown("---")
-    st.subheader("🤖 Ask a question about the content")
-    question = st.text_input("Your question:")
-
-    if question:
-        results = get_top_matches(
-            question,
-            st.session_state.chunks,
-            st.session_state.embeddings,
-            top_n=3
-        )
-        st.markdown("### 🧠 Top Relevant Chunks")
-        for i, (chunk, score) in enumerate(results, 1):
-            st.markdown(f"**{i}.** (Relevance: {score:.2f})")
-            st.code(chunk, language="markdown")
-
-st.markdown("---")
-with st.expander("📄 View chunks by page"):
-    for url, chunks in chunked_pages.items():
-        st.markdown(f"### 🔗 {url}")
-        for i, chunk in enumerate(chunks):
-            with st.expander(f"Chunk {i+1}"):
-                st.text(chunk)
+    with st.expander("📄 View chunks by page"):
+        for url, chunks in st.session_state["chunked_pages"].items():
+            st.markdown(f"### 🔗 {url}")
+            for i, chunk in enumerate(chunks):
+                with st.expander(f"Chunk {i+1}"):
+                    st.code(chunk, language="markdown")
