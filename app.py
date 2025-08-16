@@ -2,7 +2,6 @@ import streamlit as st
 from utils import process_pages_with_chunks, get_top_matches
 
 st.set_page_config(page_title="GOV.UK Data Scout", layout="wide")
-
 st.title("🕵️ GOV.UK Data Scout")
 
 with st.expander("ℹ️ What this app does", expanded=True):
@@ -23,27 +22,24 @@ with st.expander("💡 What you can learn from this", expanded=False):
 - Whether long pages should be broken down into shorter, more focused units
 """)
 
-if "urls" not in st.session_state:
-    st.session_state.urls = []
+# Input box for multiple URLs
+st.markdown("### 📥 Paste GOV.UK URLs (one per line):")
+url_input = st.text_area("Enter one or more GOV.UK URLs", placeholder="https://www.gov.uk/example-page\nhttps://www.gov.uk/another-page")
 
-url_input = st.text_input("Enter a GOV.UK URL and press Add:", "")
-if st.button("➕ Add URL") and url_input:
-    st.session_state.urls.append(url_input)
-
-if st.session_state.urls:
-    st.markdown("### ✅ URLs to process:")
-    for url in st.session_state.urls:
-        st.write(f"- {url}")
-
-if st.session_state.urls and st.button("🚀 Process GOV.UK Pages"):
-    with st.spinner("Fetching and chunking content..."):
-        try:
-            chunked_pages = process_pages_with_chunks(st.session_state.urls)
-            st.session_state.chunked_pages = chunked_pages
-            st.success("✅ All pages processed!")
-        except Exception as e:
-            st.error(f"❌ Error processing pages: {e}")
-            st.session_state.chunked_pages = {}
+# Process button
+if st.button("🚀 Process Pages"):
+    urls = [u.strip() for u in url_input.splitlines() if u.strip()]
+    if urls:
+        with st.spinner("Fetching and chunking content..."):
+            try:
+                chunked_pages = process_pages_with_chunks(urls)
+                st.session_state.chunked_pages = chunked_pages
+                st.success("✅ All pages processed!")
+            except Exception as e:
+                st.error(f"❌ Error processing pages: {e}")
+                st.session_state.chunked_pages = {}
+    else:
+        st.warning("Please enter at least one valid GOV.UK URL.")
 
 # Show chunks
 if "chunked_pages" in st.session_state:
