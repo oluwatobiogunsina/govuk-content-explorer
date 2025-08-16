@@ -55,7 +55,7 @@ def fetch_govuk_page(url, follow_links=False, max_links=3):
 
 # --- Chunking ---
 
-def chunk_text(text, max_tokens=400):
+def chunk_text(text, max_tokens=200):
     paragraphs = text.split('\n')
     chunks = []
     current_chunk = []
