@@ -56,9 +56,12 @@ if urls_input and st.button("🚀 Process Pages"):
                 chunks = chunk_text(content, max_tokens=250)  # Limit chunk size
                 all_chunks.extend(chunks)
                 st.success(f"✅ Processed {url} ({len(chunks)} chunks)")
-                
-                # ✅ Store chunks for this URL inside the loop
-                st.session_state.chunked_pages[url] = chunks
+
+                # ✅ Accumulate chunks per page
+                if url not in st.session_state.chunked_pages:
+                    st.session_state.chunked_pages[url] = chunks
+                else:
+                    st.session_state.chunked_pages[url].extend(chunks)
 
             except Exception as e:
                 st.error(f"❌ Failed to process {url}: {e}")
@@ -93,6 +96,9 @@ if st.session_state.chunks and st.session_state.embeddings:
             for i, chunk in enumerate(chunks):
                 with st.expander(f"Chunk {i+1}"):
                     st.markdown(chunk)
+
+
+
 
 
 
