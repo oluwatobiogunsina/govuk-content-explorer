@@ -1,8 +1,8 @@
 import streamlit as st
 from utils import fetch_govuk_page, chunk_text, embed_texts, get_top_matches
 
-st.set_page_config(page_title="GOV.UK Data Scout", layout="wide")
-st.title("🔍 GOV.UK Data Scout")
+st.set_page_config(page_title="GOV.UK Content Explorer", layout="wide")
+st.title("🔍 GOV.UK Content Explorer")
 
 # -- Intro Section --
 st.markdown("""
@@ -98,5 +98,6 @@ if st.session_state.chunks:
         for i, chunk in enumerate(chunks):
             with st.expander(f"Chunk {i+1}"):
                 st.markdown(chunk)
+
 
 
