@@ -1,7 +1,11 @@
 import requests
 from bs4 import BeautifulSoup
 import re
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+
+# --- Content Fetching and Cleaning ---
 
 def fetch_govuk_page(url, follow_links=False, max_links=3):
     """
@@ -9,7 +13,7 @@ def fetch_govuk_page(url, follow_links=False, max_links=3):
     """
     def clean_and_format(soup):
         parts = []
-        for elem in soup.find_all(['h1', 'h2', 'h3', 'h4', 'p', 'ul', 'ol', 'li']):
+        for elem in soup.find_all(['h1', 'h2', 'h3', 'p', 'ul', 'ol', 'li']):
             if elem.name in ['h1', 'h2', 'h3']:
                 level = int(elem.name[1])
                 parts.append(f"{'#' * level} {elem.get_text(strip=True)}")
@@ -49,10 +53,9 @@ def fetch_govuk_page(url, follow_links=False, max_links=3):
     except Exception as e:
         raise RuntimeError(f"Failed to fetch or parse page: {e}")
 
+# --- Chunking ---
+
 def chunk_text(text, max_tokens=400):
-    """
-    Splits the text into chunks of ~max_tokens size (roughly).
-    """
     paragraphs = text.split('\n')
     chunks = []
     current_chunk = []
@@ -77,43 +80,16 @@ def chunk_text(text, max_tokens=400):
 
     return chunks
 
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
+# --- Embeddings and Similarity Search ---
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
+model = SentenceTransformer("all-MiniLM-L6-v2")
 
 def embed_texts(texts):
-    """
-    Takes a list of texts and returns their local sentence embeddings.
-    """
     return model.encode(texts, show_progress_bar=False).tolist()
 
-def get_top_matches(query, chunks, k=3):
-    """
-    Returns top k most relevant chunks to the query using cosine similarity.
-    """
-    chunk_embeddings = embed_texts(chunks)
-    query_embedding = embed_texts([query])[0]
-
-    similarities = cosine_similarity([query_embedding], chunk_embeddings)[0]
-    top_indices = similarities.argsort()[-k:][::-1]
-
-    return [(chunks[i], similarities[i]) for i in top_indices]
-
-def process_pages_with_chunks(urls, follow_links=False):
-    """
-    Takes a list of URLs and returns a dictionary mapping each URL to its chunks.
-    """
-    from collections import defaultdict
-    chunked_pages = defaultdict(list)
-
-    for url in urls:
-        try:
-            text = fetch_govuk_page(url, follow_links=follow_links)
-            chunks = chunk_text(text)
-            chunked_pages[url] = chunks
-        except Exception as e:
-            print(f"Error processing {url}: {e}")
-            chunked_pages[url] = [f"❌ Error fetching or chunking: {e}"]
-
-    return chunked_pages
+def get_top_matches(query, texts, embeddings, top_n=3):
+    query_embedding = model.encode([query])
+    similarities = cosine_similarity(query_embedding, embeddings)[0]
+    top_indices = similarities.argsort()[::-1][:top_n]
+    results = [(texts[i], similarities[i]) for i in top_indices]
+    return results
