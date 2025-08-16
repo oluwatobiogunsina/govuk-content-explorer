@@ -56,7 +56,7 @@ if urls_input and st.button("🚀 Process Pages"):
         for url in urls:
             try:
                 content = fetch_govuk_page(url, follow_links=follow_links)
-                chunks = chunk_text(content, max_tokens=250)
+                chunks = chunk_text(content, max_tokens=200)
                 all_chunks.extend(chunks)
 
                 # ✅ Store per-page chunks correctly
@@ -98,4 +98,5 @@ if st.session_state.chunks:
         for i, chunk in enumerate(chunks):
             with st.expander(f"Chunk {i+1}"):
                 st.markdown(chunk)
+
 
