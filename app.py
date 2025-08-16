@@ -37,6 +37,8 @@ if "chunks" not in st.session_state:
     st.session_state.chunks = []
 if "embeddings" not in st.session_state:
     st.session_state.embeddings = []
+if "chunked_pages" not in st.session_state:
+    st.session_state.chunked_pages = {}
 
 # Input
 urls_input = st.text_area("Enter GOV.UK page URLs (one per line):", height=150)
@@ -61,6 +63,8 @@ if urls_input and st.button("🚀 Process Pages"):
     st.session_state.chunks = all_chunks
     st.session_state.embeddings = embed_texts(all_chunks)
     st.success("✅ All pages processed and embeddings generated!")
+    st.session_state.chunked_pages[url] = chunks
+
 
 # Search / Ask a question
 if st.session_state.chunks and st.session_state.embeddings:
@@ -79,3 +83,11 @@ if st.session_state.chunks and st.session_state.embeddings:
         for i, (chunk, score) in enumerate(results, 1):
             st.markdown(f"**{i}.** (Relevance: {score:.2f})")
             st.code(chunk, language="markdown")
+
+st.markdown("## 🔍 See other chunks by page")
+for url, chunks in st.session_state.chunked_pages.items():
+    st.markdown(f"### 🔗 {url}")
+    for i, chunk in enumerate(chunks):
+        with st.expander(f"Chunk {i+1}"):
+            st.markdown(chunk)
+
