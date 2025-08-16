@@ -75,24 +75,24 @@ def chunk_text(text: str, max_words=150) -> List[str]:
     return chunks
 
 from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
 
-# Load once
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+model = SentenceTransformer("all-MiniLM-L6-v2")
 
 def embed_texts(texts):
     """
-    Generate embeddings for a list of texts using a local model.
+    Takes a list of texts and returns their local sentence embeddings.
     """
-    return embedding_model.encode(texts, show_progress_bar=False)
+    return model.encode(texts, show_progress_bar=False).tolist()
 
-def get_top_matches(question, chunks, chunk_embeddings, top_n=3):
-    """
-    Embed the question, compare to chunk embeddings, and return top N most similar chunks.
-    """
-    question_embedding = embedding_model.encode([question])
-    similarities = cosine_similarity(question_embedding, chunk_embeddings)[0]
+from sklearn.metrics.pairwise import cosine_similarity
 
-    top_indices = similarities.argsort()[-top_n:][::-1]
-    return [(chunks[i], similarities[i]) for i in top_indices]
+def get_top_matches(query, texts, embeddings, top_n=3):
+    """
+    Takes a user query and returns the top_n most relevant chunks.
+    """
+    query_embedding = model.encode([query])
+    similarities = cosine_similarity(query_embedding, embeddings)[0]
+    top_indices = similarities.argsort()[::-1][:top_n]
+    results = [(texts[i], similarities[i]) for i in top_indices]
+    return results
 
