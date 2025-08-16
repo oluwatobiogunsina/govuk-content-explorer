@@ -31,20 +31,6 @@ def fetch_govuk_page(url, follow_links=False, max_links=3):
         main = soup.find('main')
         if not main:
             raise ValueError("No <main> content found")
-            # Remove non-content sections that may still be inside <main>
-                non_content_selectors = [
-                    '.gem-c-contextual-sidebar',
-                    '.gem-c-related-navigation',
-                    'nav',
-                    'aside',
-                    'header',
-                    'footer'
-                ]
-                
-                for selector in non_content_selectors:
-                    for tag in main.select(selector):
-                        tag.decompose()
-
         content = clean_and_format(main)
 
         if follow_links:
