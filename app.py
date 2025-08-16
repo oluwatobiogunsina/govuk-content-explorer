@@ -1,6 +1,15 @@
 import streamlit as st
 from utils import fetch_govuk_page, chunk_text, embed_texts, get_top_matches
 
+# Initialize session state variables if not already set
+if "chunked_pages" not in st.session_state:
+    st.session_state["chunked_pages"] = {}
+if "embeddings" not in st.session_state:
+    st.session_state["embeddings"] = []
+if "all_chunks" not in st.session_state:
+    st.session_state["all_chunks"] = []
+
+
 st.set_page_config(page_title="GOV.UK Data Scout", layout="wide")
 st.title("🔍 GOV.UK Data Scout")
 st.markdown("""
@@ -72,3 +81,4 @@ if "chunks" in st.session_state and "embeddings" in st.session_state:
             for i, chunk in enumerate(chunks):
                 with st.expander(f"Chunk {i+1}"):
                     st.code(chunk, language="markdown")
+
