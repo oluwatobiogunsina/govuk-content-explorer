@@ -71,6 +71,14 @@ if urls_input and st.button("🚀 Process Pages"):
     st.session_state.embeddings = embed_texts(all_chunks)
     st.success("✅ All pages processed and embeddings generated!")
 
+# -- View All Chunks by Page --
+if st.session_state.chunks:
+    st.markdown("## 📄 View all chunks by page")
+    for url, chunks in st.session_state.chunked_pages.items():
+        st.markdown(f"### 🔗 {url}")
+        for i, chunk in enumerate(chunks):
+            with st.expander(f"Chunk {i+1}"):
+                st.markdown(chunk)
 
 # -- Semantic Search --
 if st.session_state.chunks and st.session_state.embeddings:
@@ -89,14 +97,5 @@ if st.session_state.chunks and st.session_state.embeddings:
         for i, (chunk, score) in enumerate(results, 1):
             st.markdown(f"**{i}.** (Relevance: {score:.2f})")
             st.code(chunk, language="markdown")
-
-# -- View All Chunks by Page --
-if st.session_state.chunks:
-    st.markdown("## 📄 View all chunks by page")
-    for url, chunks in st.session_state.chunked_pages.items():
-        st.markdown(f"### 🔗 {url}")
-        for i, chunk in enumerate(chunks):
-            with st.expander(f"Chunk {i+1}"):
-                st.markdown(chunk)
 
 
