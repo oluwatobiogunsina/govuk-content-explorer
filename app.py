@@ -1,81 +1,95 @@
-import streamlit as st
-from utils import fetch_govuk_page, chunk_text, embed_texts, get_top_matches
+import requests
+from bs4 import BeautifulSoup
+import re
+from urllib.parse import urljoin
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
 
-st.set_page_config(page_title="GOV.UK Data Scout", layout="wide")
-st.title("🔍 GOV.UK Data Scout")
-st.markdown("""
-### 🧠 About This Tool
+# --- Content Fetching and Cleaning ---
 
-This tool helps evaluate how GOV.UK content performs in AI-powered retrieval systems, especially those using large language models (LLMs) and semantic search. It:
+def fetch_govuk_page(url, follow_links=False, max_links=3):
+    """
+    Fetches structured content from a GOV.UK page. Optionally follows internal GOV.UK links.
+    """
+    def clean_and_format(soup):
+        parts = []
+        for elem in soup.find_all(['h1', 'h2', 'h3', 'p', 'ul', 'ol', 'li']):
+            if elem.name in ['h1', 'h2', 'h3']:
+                level = int(elem.name[1])
+                parts.append(f"{'#' * level} {elem.get_text(strip=True)}")
+            elif elem.name == 'p':
+                parts.append(elem.get_text(strip=True))
+            elif elem.name in ['ul', 'ol']:
+                for li in elem.find_all('li'):
+                    parts.append(f"- {li.get_text(strip=True)}")
+        return '\n'.join(part for part in parts if part).strip()
 
-- **Fetches content** from a GOV.UK page (and selected internal links)  
-- **Splits the content into semantic chunks** — similar to how AI models parse and retrieve text  
-- **Generates local embeddings** of each chunk for fast, similarity-based search  
-- **Allows you to ask a question** and see the top-matching content chunks
-""")
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        main = soup.find('main')
+        if not main:
+            raise ValueError("No <main> content found")
+        content = clean_and_format(main)
 
-with st.expander("💡 What You Can Learn"):
-    st.markdown("""
-    **1. Content structure**  
-    See how your content is chunked. Are the chunks focused and meaningful on their own? This helps assess whether your content works when consumed out of its original context — critical for AI tools.
+        if follow_links:
+            internal_links = [
+                urljoin(url, a['href'])
+                for a in main.find_all('a', href=True)
+                if a['href'].startswith('/') and 'mailto:' not in a['href']
+            ]
+            visited = set()
+            for link in internal_links[:max_links]:
+                if link not in visited:
+                    visited.add(link)
+                    try:
+                        sub_content = fetch_govuk_page(link, follow_links=False)
+                        content += f"\n\n---\n\n## Linked Page: {link}\n\n{sub_content}"
+                    except Exception as e:
+                        print(f"Skipped link {link}: {e}")
+        return content
 
-    **2. AI-friendliness**  
-    Try asking a question. Do the retrieved chunks answer it well? This shows how well your content performs in a retrieval-augmented generation (RAG) system, where relevant information is passed to an LLM to answer user queries.
+    except Exception as e:
+        raise RuntimeError(f"Failed to fetch or parse page: {e}")
 
-    **3. Metadata and clarity gaps**  
-    You can infer where metadata might help improve retrieval accuracy. If irrelevant chunks are shown, it may be due to a lack of:
-    - Clear headings or structure  
-    - Time- or audience-specific labelling  
-    - Consistent terminology
+# --- Chunking ---
 
-    These insights help you identify opportunities to improve the **AI readiness** of your content.
-    """)
+def chunk_text(text, max_tokens=400):
+    paragraphs = text.split('\n')
+    chunks = []
+    current_chunk = []
+    current_length = 0
 
+    for para in paragraphs:
+        para = para.strip()
+        if not para:
+            continue
+        length = len(para.split())
 
-# Session state for storing page content and embeddings
-if "chunks" not in st.session_state:
-    st.session_state.chunks = []
-if "embeddings" not in st.session_state:
-    st.session_state.embeddings = []
+        if current_length + length > max_tokens:
+            chunks.append('\n'.join(current_chunk))
+            current_chunk = [para]
+            current_length = length
+        else:
+            current_chunk.append(para)
+            current_length += length
 
-# Input
-urls_input = st.text_area("Enter GOV.UK page URLs (one per line):", height=150)
-follow_links = st.checkbox("Follow internal links on each page", value=False)
+    if current_chunk:
+        chunks.append('\n'.join(current_chunk))
 
-# Process Pages
-if urls_input and st.button("🚀 Process Pages"):
-    urls = [url.strip() for url in urls_input.splitlines() if url.strip()]
-    all_chunks = []
+    return chunks
 
-    with st.spinner("Fetching and processing content..."):
-        for url in urls:
-            try:
-                content = fetch_govuk_page(url, follow_links=follow_links)
-                chunks = chunk_text(content, max_tokens=250)  # Limit chunk size
-                all_chunks.extend(chunks)
-                st.success(f"✅ Processed {url} ({len(chunks)} chunks)")
-            except Exception as e:
-                st.error(f"❌ Failed to process {url}: {e}")
+# --- Embeddings and Similarity Search ---
 
-    # Store in session state
-    st.session_state.chunks = all_chunks
-    st.session_state.embeddings = embed_texts(all_chunks)
-    st.success("✅ All pages processed and embeddings generated!")
+model = SentenceTransformer("all-MiniLM-L6-v2")
 
-# Search / Ask a question
-if st.session_state.chunks and st.session_state.embeddings:
-    st.markdown("---")
-    st.subheader("🤖 Ask a question about the content")
-    question = st.text_input("Your question:")
+def embed_texts(texts):
+    return model.encode(texts, show_progress_bar=False).tolist()
 
-    if question:
-        results = get_top_matches(
-            question,
-            st.session_state.chunks,
-            st.session_state.embeddings,
-            top_n=3
-        )
-        st.markdown("### 🧠 Top Relevant Chunks")
-        for i, (chunk, score) in enumerate(results, 1):
-            st.markdown(f"**{i}.** (Relevance: {score:.2f})")
-            st.code(chunk, language="markdown")
+def get_top_matches(query, texts, embeddings, top_n=3):
+    query_embedding = model.encode([query])
+    similarities = cosine_similarity(query_embedding, embeddings)[0]
+    top_indices = similarities.argsort()[::-1][:top_n]
+    results = [(texts[i], similarities[i]) for i in top_indices]
+    return results
