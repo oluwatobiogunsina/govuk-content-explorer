@@ -75,7 +75,9 @@ def chunk_text(text: str, max_words=150) -> List[str]:
     return chunks
 
 from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
 
+# Load the sentence transformer model once
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
 def embed_texts(texts):
@@ -83,8 +85,6 @@ def embed_texts(texts):
     Takes a list of texts and returns their local sentence embeddings.
     """
     return model.encode(texts, show_progress_bar=False).tolist()
-
-from sklearn.metrics.pairwise import cosine_similarity
 
 def get_top_matches(query, texts, embeddings, top_n=3):
     """
