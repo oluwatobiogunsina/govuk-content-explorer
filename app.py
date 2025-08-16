@@ -46,9 +46,11 @@ urls_input = st.text_area("Enter GOV.UK page URLs (one per line):", height=150)
 follow_links = st.checkbox("Follow internal links on each page", value=False)
 
 # -- Process Pages --
+# -- Process Pages --
 if urls_input and st.button("🚀 Process Pages"):
     urls = [url.strip() for url in urls_input.splitlines() if url.strip()]
     all_chunks = []
+    st.session_state.chunked_pages = {}  # 🧹 Clear old page-wise data
 
     with st.spinner("Fetching and processing content..."):
         for url in urls:
@@ -56,21 +58,19 @@ if urls_input and st.button("🚀 Process Pages"):
                 content = fetch_govuk_page(url, follow_links=follow_links)
                 chunks = chunk_text(content, max_tokens=250)
                 all_chunks.extend(chunks)
+
+                # ✅ Store per-page chunks correctly
+                st.session_state.chunked_pages[url] = chunks
+
                 st.success(f"✅ Processed {url} ({len(chunks)} chunks)")
-
-                # ✅ Accumulate chunks per page
-                if url not in st.session_state.chunked_pages:
-                    st.session_state.chunked_pages[url] = chunks
-                else:
-                    st.session_state.chunked_pages[url].extend(chunks)
-
             except Exception as e:
                 st.error(f"❌ Failed to process {url}: {e}")
 
-    # Store all embeddings
+    # Store all chunks + embeddings
     st.session_state.chunks = all_chunks
     st.session_state.embeddings = embed_texts(all_chunks)
     st.success("✅ All pages processed and embeddings generated!")
+
 
 # -- Semantic Search --
 if st.session_state.chunks and st.session_state.embeddings:
@@ -90,10 +90,12 @@ if st.session_state.chunks and st.session_state.embeddings:
             st.markdown(f"**{i}.** (Relevance: {score:.2f})")
             st.code(chunk, language="markdown")
 
-    # View chunks by page
-    st.markdown("## 🔍 See all chunks by page")
+# -- View All Chunks by Page --
+if st.session_state.chunked_pages:
+    st.markdown("## 📄 View all chunks by page")
     for url, chunks in st.session_state.chunked_pages.items():
         st.markdown(f"### 🔗 {url}")
         for i, chunk in enumerate(chunks):
             with st.expander(f"Chunk {i+1}"):
                 st.markdown(chunk)
+
