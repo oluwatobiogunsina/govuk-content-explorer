@@ -33,6 +33,18 @@ Poor chunk performance might reveal:
 These are clues for improving GOV.UK content for use in future AI services.
 
 ---
+| Tool                                                                | Purpose                                                           |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| **[Streamlit](https://streamlit.io/)**                              | Web app framework for building the interactive interface          |
+| **[BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/)** | HTML parsing and content extraction from GOV.UK pages             |
+| **[Requests](https://docs.python-requests.org/)**                   | Fetching content from GOV.UK URLs                                 |
+| **[SentenceTransformers](https://www.sbert.net/)**                  | Generating semantic embeddings using the `all-MiniLM-L6-v2` model |
+| **[scikit-learn](https://scikit-learn.org/)**                       | Calculating cosine similarity for semantic search                 |
+| **[Markdown](https://www.markdownguide.org/)**                      | Rendering structured content and chunks in readable format        |
+| **Python 3.x**                                                      | Programming language used across all components                   |
+
+
+---
 
 ## 🛠️ Installation
 
