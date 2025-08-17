@@ -32,7 +32,7 @@ Poor chunk performance might reveal:
 
 These are clues for improving GOV.UK content for use in future AI services.
 
----
+## 🛠️ Tools used
 | Tool                                                                | Purpose                                                           |
 | ------------------------------------------------------------------- | ----------------------------------------------------------------- |
 | **[Streamlit](https://streamlit.io/)**                              | Web app framework for building the interactive interface          |
@@ -42,9 +42,6 @@ These are clues for improving GOV.UK content for use in future AI services.
 | **[scikit-learn](https://scikit-learn.org/)**                       | Calculating cosine similarity for semantic search                 |
 | **[Markdown](https://www.markdownguide.org/)**                      | Rendering structured content and chunks in readable format        |
 | **Python 3.x**                                                      | Programming language used across all components                   |
-
-
----
 
 ## 🛠️ Installation
 
